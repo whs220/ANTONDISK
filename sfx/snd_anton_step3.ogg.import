@@ -1,0 +1,15 @@
+[remap]
+
+importer="ogg_vorbis"
+type="AudioStreamOGGVorbis"
+path="res://.import/snd_anton_step3.ogg-b1a612e344c900b4fd2b302456a5554f.oggstr"
+
+[deps]
+
+source_file="res://sfx/snd_anton_step3.ogg"
+dest_files=[ "res://.import/snd_anton_step3.ogg-b1a612e344c900b4fd2b302456a5554f.oggstr" ]
+
+[params]
+
+loop=false
+loop_offset=0

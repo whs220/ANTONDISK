@@ -1,0 +1,15 @@
+[remap]
+
+importer="ogg_vorbis"
+type="AudioStreamOGGVorbis"
+path="res://.import/shake.ogg-77db2aead1fded70303931d60f2a4b31.oggstr"
+
+[deps]
+
+source_file="res://sfx/shake.ogg"
+dest_files=[ "res://.import/shake.ogg-77db2aead1fded70303931d60f2a4b31.oggstr" ]
+
+[params]
+
+loop=false
+loop_offset=0

@@ -1,0 +1,15 @@
+[remap]
+
+importer="ogg_vorbis"
+type="AudioStreamOGGVorbis"
+path="res://.import/satan_map.ogg-e476ff4ab57e5c403d7d3da6a6224fb3.oggstr"
+
+[deps]
+
+source_file="res://music/satan_map.ogg"
+dest_files=[ "res://.import/satan_map.ogg-e476ff4ab57e5c403d7d3da6a6224fb3.oggstr" ]
+
+[params]
+
+loop=true
+loop_offset=0

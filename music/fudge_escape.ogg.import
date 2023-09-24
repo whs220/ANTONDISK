@@ -1,0 +1,15 @@
+[remap]
+
+importer="ogg_vorbis"
+type="AudioStreamOGGVorbis"
+path="res://.import/fudge_escape.ogg-d786d09000944e8fa3f0503a8fc66a13.oggstr"
+
+[deps]
+
+source_file="res://music/fudge_escape.ogg"
+dest_files=[ "res://.import/fudge_escape.ogg-d786d09000944e8fa3f0503a8fc66a13.oggstr" ]
+
+[params]
+
+loop=true
+loop_offset=63.0

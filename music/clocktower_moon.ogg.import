@@ -1,0 +1,15 @@
+[remap]
+
+importer="ogg_vorbis"
+type="AudioStreamOGGVorbis"
+path="res://.import/clocktower_moon.ogg-8b995ee75f6390c73ca371ea5ee33b8d.oggstr"
+
+[deps]
+
+source_file="res://music/clocktower_moon.ogg"
+dest_files=[ "res://.import/clocktower_moon.ogg-8b995ee75f6390c73ca371ea5ee33b8d.oggstr" ]
+
+[params]
+
+loop=false
+loop_offset=0

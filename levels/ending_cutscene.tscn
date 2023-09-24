@@ -1,0 +1,466 @@
+[gd_scene load_steps=22 format=2]
+
+[ext_resource path="res://sfx/telephone.ogg" type="AudioStream" id=1]
+[ext_resource path="res://textures/cutscene_text_box.png" type="Texture" id=2]
+[ext_resource path="res://Boo City.ttf" type="DynamicFontData" id=3]
+[ext_resource path="res://textures/cutscene_phone.png" type="Texture" id=4]
+[ext_resource path="res://textures/cutscene_anton_talk.png" type="Texture" id=5]
+[ext_resource path="res://textures/cutscene_anton_happy.png" type="Texture" id=6]
+[ext_resource path="res://textures/cutscene_anton_brulo.png" type="Texture" id=7]
+[ext_resource path="res://textures/cutscene_anton_noone.png" type="Texture" id=8]
+[ext_resource path="res://textures/cutscene_anton_noone_brulo.png" type="Texture" id=9]
+[ext_resource path="res://music/win.ogg" type="AudioStream" id=10]
+[ext_resource path="res://sfx/timp.ogg" type="AudioStream" id=11]
+
+[sub_resource type="GDScript" id=1]
+resource_name = "Cutscene"
+script/source = "extends Control
+
+onready var anton_hey = preload(\"res://sfx/anton_hey.wav\")
+onready var anton_happy = preload(\"res://sfx/snd_anton_yay1.wav\")
+onready var anton_happy2 = preload(\"res://sfx/snd_anton_yay2.wav\")
+onready var brulo_happy = preload(\"res://sfx/snd_brulo_yay2.wav\")
+onready var brulo_help = preload(\"res://sfx/snd_brulo_hurt1.wav\")
+onready var anton_grr = preload(\"res://sfx/snd_anton_hurt1.wav\")
+
+var lines = [
+	\"Brulo here, who is-\",
+	\"[b]HAHAHAHAH!\",
+	\"I MADE IT! GOT DOWN THERE AND KICKED SATAN'S ASS!\",
+	\"Alright! So do you have the [color=yellow]Golden Poker C-\",
+	\"He didn't have it.\",
+	\"W-what?\",
+	\"Yeah. I asked him about it and all he had was this [color=blue]amulet... thing[/color].\",
+	\"He said it belonged to y-\",
+	\"Wait..! hold on...\",
+	\"Oh! ...HAHA!\",
+	\"What's up? Did you find another place for me to look?\",
+	\"I found it!!\",
+	\"It was in my back pocket the whole time!! HAHA!\",
+	\"...erm...\",
+	\"what the blast\",
+	\"Yup! Finally! I been looking everywhere for it! You have no idea how hard it has been!\",
+	\"...\",
+	\"Welp! That's good. As long as I got my booze I'm happy. I'll be there in a bit.\",
+	\"Oh. Well...\",
+	\"What?\",
+	\"...I said I would only give it to you if [color=yellow]you[/color] found it.\",
+	\"And... well... profits are down this month... so... y'know.\",
+	\"[b]YOU'RE SAYIN THAT I ALMOST DIED FOR NOTHING??\",
+	\"Well... uh...\",
+	\"...I'll see you around.\"
+]
+
+var line = -1
+var speed = 0.05
+
+var ready = false
+
+signal progress
+
+func _ready():
+	Globals.save_game()
+	Transitions.grow_in()
+	Globals.checkpoint = false
+	Globals.secret = false
+	VisualServer.set_default_clear_color(Color(0, 0, 0))
+	$AnimationPlayer.play(\"intro\")
+	$Audio.play()
+	yield($AnimationPlayer, \"animation_finished\")
+	
+	next_line(1, 0.05)
+	yield(self, \"progress\")
+	$Camera2D.add_trauma(0.5)
+	$Music.play()
+	next_line(0, 0.02, anton_happy)
+	yield(self, \"progress\")
+	next_line(0, 0.02)
+	yield(self, \"progress\")
+	next_line(1, 0.03)
+	yield(self, \"progress\")
+	$Music/Tween.interpolate_property($Music, \"pitch_scale\", 1, 0.5, 4, Tween.TRANS_LINEAR)
+	$Music/Tween.interpolate_property($Music, \"volume_db\", 0, -80, 4, Tween.TRANS_LINEAR)
+	$Music/Tween.start()
+	next_line(0, 0.02)
+	yield(self, \"progress\")
+	next_line(1, 0.05)
+	yield(self, \"progress\")
+	next_line(0, 0.02)
+	yield(self, \"progress\")
+	next_line(0, 0.08)
+	yield(self, \"progress\")
+	next_line(1, 0.02)
+	yield(self, \"progress\")
+	next_line(1, 0.05)
+	yield(self, \"progress\")
+	next_line(0, 0.02)
+	yield(self, \"progress\")
+	next_line(1, 0.02, brulo_happy)
+	yield(self, \"progress\")
+	$Timp.play()
+	next_line(1, 0.02)
+	yield(self, \"progress\")
+	next_line(0, 0.02)
+	$Music.stop()
+	$Music.pitch_scale = 1
+	$Music.volume_db = 0
+	$Music.stream = preload(\"res://music/brulo_call.ogg\")
+	$Music.play()
+	yield(self, \"progress\")
+	next_line(0, 0.02)
+	yield(self, \"progress\")
+	next_line(1, 0.02)
+	yield(self, \"progress\")
+	next_line(0, 0.02)
+	yield(self, \"progress\")
+	next_line(0, 0.02, anton_happy2)
+	yield(self, \"progress\")
+	next_line(1, 0.02)
+	yield(self, \"progress\")
+	next_line(0, 0.02)
+	yield(self, \"progress\")
+	next_line(1, 0.02)
+	yield(self, \"progress\")
+	next_line(1, 0.02)
+	yield(self, \"progress\")
+	next_line(0, 0.02, anton_grr)
+	$Camera2D.add_trauma(0.5)
+	yield(self, \"progress\")
+	next_line(1, 0.02)
+	yield(self, \"progress\")
+	next_line(1, 0.02)
+	yield(self, \"progress\")
+	$Music/Tween.interpolate_property($Music, \"volume_db\", 0, -80, 4, Tween.TRANS_LINEAR)
+	$Music/Tween.start()
+	$AnimationPlayer.play(\"close\")
+	
+	yield($AnimationPlayer, \"animation_finished\")
+	yield(get_tree().create_timer(1, false), \"timeout\")
+	Transitions.grow_out()
+	yield(Transitions, \"done\")
+	get_tree().change_scene(\"res://levels/ending_part2.tscn\")
+
+func next_line(who, sp, sfx = null):
+	speed = sp
+	match who:
+		0:
+			$Phone/AnimatedSprite.play(\"anton\")
+			$Texture.self_modulate = Color.red
+		1:
+			$Phone/AnimatedSprite.play(\"brulo\")
+			$Texture.self_modulate = Color.yellow
+		2:
+			$Phone/AnimatedSprite.play(\"anton_beer\")
+			$Texture.self_modulate = Color.red
+		3:
+			$Phone/AnimatedSprite.play(\"brulo\")
+			$Texture.self_modulate = Color.yellow
+	line += 1
+	$Texture/RichTextLabel.visible_characters = 0
+	$Texture/RichTextLabel.bbcode_text = lines[line]
+	if sfx != null:
+		$Audio.stream = sfx
+		$Audio.play()
+	for letter in $Texture/RichTextLabel.text:
+		$Texture/RichTextLabel.visible_characters += 1
+		yield(get_tree().create_timer(speed, false), \"timeout\")
+	if who != 2:
+		$Phone/AnimatedSprite.stop()
+		$Phone/AnimatedSprite.frame = 1
+	if lines[line].right(lines[line].length()-1) == \"-\":
+		emit_signal(\"progress\")
+	else:
+		ready = true
+
+func _physics_process(delta):
+	$Texture.rect_size.y = $Texture/RichTextLabel.rect_size.y + 16
+	
+	if Input.is_action_just_pressed(\"jump\") and ready:
+		ready = false
+		emit_signal(\"progress\")
+"
+
+[sub_resource type="DynamicFont" id=6]
+size = 60
+font_data = ExtResource( 3 )
+
+[sub_resource type="DynamicFont" id=2]
+size = 30
+font_data = ExtResource( 3 )
+
+[sub_resource type="AtlasTexture" id=9]
+atlas = ExtResource( 6 )
+region = Rect2( 0, 0, 60, 60 )
+
+[sub_resource type="AtlasTexture" id=10]
+atlas = ExtResource( 6 )
+region = Rect2( 60, 0, 60, 60 )
+
+[sub_resource type="SpriteFrames" id=3]
+animations = [ {
+"frames": [ ExtResource( 5 ), ExtResource( 8 ) ],
+"loop": true,
+"name": "anton",
+"speed": 5.0
+}, {
+"frames": [ SubResource( 9 ), SubResource( 10 ) ],
+"loop": true,
+"name": "anton_beer",
+"speed": 6.0
+}, {
+"frames": [ ExtResource( 7 ), ExtResource( 9 ) ],
+"loop": true,
+"name": "brulo",
+"speed": 5.0
+} ]
+
+[sub_resource type="Animation" id=5]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/path = NodePath("Texture:rect_position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/keys = {
+"times": PoolRealArray( 0 ),
+"transitions": PoolRealArray( 1 ),
+"update": 0,
+"values": [ Vector2( -448, 104 ) ]
+}
+tracks/1/type = "value"
+tracks/1/path = NodePath("Phone:rect_position")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/keys = {
+"times": PoolRealArray( 0 ),
+"transitions": PoolRealArray( 1 ),
+"update": 0,
+"values": [ Vector2( 512, 640 ) ]
+}
+tracks/2/type = "value"
+tracks/2/path = NodePath("Texture:rect_size")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/keys = {
+"times": PoolRealArray( 0 ),
+"transitions": PoolRealArray( 1 ),
+"update": 0,
+"values": [ Vector2( 384, 144 ) ]
+}
+tracks/3/type = "value"
+tracks/3/path = NodePath("Texture:margin_right")
+tracks/3/interp = 1
+tracks/3/loop_wrap = true
+tracks/3/imported = false
+tracks/3/enabled = true
+tracks/3/keys = {
+"times": PoolRealArray( 0 ),
+"transitions": PoolRealArray( 1 ),
+"update": 1,
+"values": [ 904.0 ]
+}
+tracks/4/type = "value"
+tracks/4/path = NodePath("Texture:margin_left")
+tracks/4/interp = 1
+tracks/4/loop_wrap = true
+tracks/4/imported = false
+tracks/4/enabled = true
+tracks/4/keys = {
+"times": PoolRealArray( 0 ),
+"transitions": PoolRealArray( 1 ),
+"update": 1,
+"values": [ 520.0 ]
+}
+tracks/5/type = "value"
+tracks/5/path = NodePath("Texture:margin_top")
+tracks/5/interp = 1
+tracks/5/loop_wrap = true
+tracks/5/imported = false
+tracks/5/enabled = true
+tracks/5/keys = {
+"times": PoolRealArray( 0 ),
+"transitions": PoolRealArray( 1 ),
+"update": 1,
+"values": [ 0.000198364 ]
+}
+tracks/6/type = "value"
+tracks/6/path = NodePath("Texture:margin_bottom")
+tracks/6/interp = 1
+tracks/6/loop_wrap = true
+tracks/6/imported = false
+tracks/6/enabled = true
+tracks/6/keys = {
+"times": PoolRealArray( 0 ),
+"transitions": PoolRealArray( 1 ),
+"update": 1,
+"values": [ 72.0002 ]
+}
+
+[sub_resource type="Animation" id=7]
+resource_name = "close"
+length = 0.5
+tracks/0/type = "value"
+tracks/0/path = NodePath("Phone:rect_position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/keys = {
+"times": PoolRealArray( 0, 0.5 ),
+"transitions": PoolRealArray( 0.3, 1 ),
+"update": 0,
+"values": [ Vector2( 512, 40 ), Vector2( 512, 648 ) ]
+}
+tracks/1/type = "value"
+tracks/1/path = NodePath("Texture:rect_position")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/keys = {
+"times": PoolRealArray( 0, 0.5 ),
+"transitions": PoolRealArray( 0.3, 1 ),
+"update": 0,
+"values": [ Vector2( 64, 104 ), Vector2( -456, 104 ) ]
+}
+
+[sub_resource type="Animation" id=4]
+resource_name = "intro"
+length = 4.0
+tracks/0/type = "value"
+tracks/0/path = NodePath("Texture:rect_position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/keys = {
+"times": PoolRealArray( 0, 3.5, 4 ),
+"transitions": PoolRealArray( 1, 0.3, 1 ),
+"update": 0,
+"values": [ Vector2( -448, 104 ), Vector2( -448, 104 ), Vector2( 64, 104 ) ]
+}
+tracks/1/type = "value"
+tracks/1/path = NodePath("Phone:rect_position")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/keys = {
+"times": PoolRealArray( 0, 3, 4 ),
+"transitions": PoolRealArray( 1, 0.5, 1 ),
+"update": 0,
+"values": [ Vector2( 512, 640 ), Vector2( 512, 640 ), Vector2( 512, 40 ) ]
+}
+
+[sub_resource type="GDScript" id=8]
+resource_name = "Camera"
+script/source = "extends Camera2D
+
+export var decay = 0.8  # How quickly the shaking stops [0, 1].
+export var max_offset = Vector2(100, 75)  # Maximum hor/ver shake in pixels.
+export var max_roll = 0.1  # Maximum rotation in radians (use sparingly).
+
+var trauma = 0.0  # Current shake strength.
+var trauma_power = 2  # Trauma exponent. Use [2, 3].
+
+func _ready():
+	randomize()
+
+func add_trauma(amount):
+	trauma = min(trauma + amount, 1.0)
+	if trauma > 0.6:
+		trauma = 0.6 # max
+
+func _process(delta):
+	if trauma and Globals.screen_shake:
+		trauma = max(trauma - decay * delta, 0)
+		shake()
+
+func shake():
+	var amount = pow(trauma, trauma_power)
+	rotation = max_roll * amount * rand_range(-1, 1)
+	offset.x = max_offset.x * amount * rand_range(-1, 1)
+	offset.y = max_offset.y * amount * rand_range(-1, 1)
+"
+
+[node name="Cutscene" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = SubResource( 1 )
+
+[node name="Audio" type="AudioStreamPlayer" parent="."]
+stream = ExtResource( 1 )
+bus = "SFX"
+
+[node name="Timp" type="AudioStreamPlayer" parent="."]
+stream = ExtResource( 11 )
+bus = "SFX"
+
+[node name="Music" type="AudioStreamPlayer" parent="."]
+stream = ExtResource( 10 )
+bus = "Music"
+
+[node name="Tween" type="Tween" parent="Music"]
+
+[node name="Texture" type="NinePatchRect" parent="."]
+self_modulate = Color( 1, 0, 0, 1 )
+show_behind_parent = true
+anchor_left = -1.21
+anchor_top = 0.173333
+anchor_right = -1.21
+anchor_bottom = 0.293333
+margin_left = 520.0
+margin_top = 0.000198364
+margin_right = 904.0
+margin_bottom = 72.0002
+texture = ExtResource( 2 )
+region_rect = Rect2( 0, 0, 32, 32 )
+patch_margin_left = 2
+patch_margin_top = 2
+patch_margin_right = 2
+patch_margin_bottom = 2
+__meta__ = {
+"_edit_group_": true,
+"_edit_use_anchors_": true
+}
+
+[node name="RichTextLabel" type="RichTextLabel" parent="Texture"]
+margin_left = 8.0
+margin_top = 8.0
+margin_right = 376.0
+margin_bottom = 64.0
+rect_clip_content = false
+custom_colors/default_color = Color( 1, 1, 1, 1 )
+custom_fonts/bold_font = SubResource( 6 )
+custom_fonts/normal_font = SubResource( 2 )
+bbcode_enabled = true
+fit_content_height = true
+
+[node name="Phone" type="TextureRect" parent="."]
+margin_left = 512.0
+margin_top = 640.0
+margin_right = 608.0
+margin_bottom = 897.0
+rect_scale = Vector2( 2, 2 )
+texture = ExtResource( 4 )
+
+[node name="AnimatedSprite" type="AnimatedSprite" parent="Phone"]
+position = Vector2( 48, 81 )
+frames = SubResource( 3 )
+animation = "anton"
+frame = 1
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+anims/RESET = SubResource( 5 )
+anims/close = SubResource( 7 )
+anims/intro = SubResource( 4 )
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2( 400, 304 )
+current = true
+script = SubResource( 8 )
