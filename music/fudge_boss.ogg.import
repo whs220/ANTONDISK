@@ -1,0 +1,15 @@
+[remap]
+
+importer="ogg_vorbis"
+type="AudioStreamOGGVorbis"
+path="res://.import/fudge_boss.ogg-f1584b92eed52033b70e74278f03e4cc.oggstr"
+
+[deps]
+
+source_file="res://music/fudge_boss.ogg"
+dest_files=[ "res://.import/fudge_boss.ogg-f1584b92eed52033b70e74278f03e4cc.oggstr" ]
+
+[params]
+
+loop=true
+loop_offset=5.33

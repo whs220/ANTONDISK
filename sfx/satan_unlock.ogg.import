@@ -1,0 +1,15 @@
+[remap]
+
+importer="ogg_vorbis"
+type="AudioStreamOGGVorbis"
+path="res://.import/satan_unlock.ogg-217da1027d0794e6dd01ebaa9de9852d.oggstr"
+
+[deps]
+
+source_file="res://sfx/satan_unlock.ogg"
+dest_files=[ "res://.import/satan_unlock.ogg-217da1027d0794e6dd01ebaa9de9852d.oggstr" ]
+
+[params]
+
+loop=false
+loop_offset=0

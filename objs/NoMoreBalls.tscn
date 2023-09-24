@@ -1,0 +1,38 @@
+[gd_scene load_steps=4 format=2]
+
+[ext_resource path="res://textures/nomoreballs.png" type="Texture" id=1]
+
+[sub_resource type="GDScript" id=76]
+resource_name = "NoMoreBalls"
+script/source = "extends Area2D
+
+
+
+func _on_Area2D_body_entered(body):
+	if body.is_in_group(\"Anton\"):
+		go()
+
+func go():
+	var balls = get_tree().get_nodes_in_group(\"Ball\")
+	for ball in balls:
+		ball.disable()
+		break
+	for ball in balls:
+		if ball.state != 0:
+			ball.queue_free()
+"
+
+[sub_resource type="RectangleShape2D" id=2]
+extents = Vector2( 16, 600 )
+
+[node name="NoMoreBalls" type="Area2D"]
+script = SubResource( 76 )
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource( 2 )
+
+[node name="Sprite" type="Sprite" parent="."]
+scale = Vector2( 2, 2 )
+texture = ExtResource( 1 )
+
+[connection signal="body_entered" from="." to="." method="_on_Area2D_body_entered"]

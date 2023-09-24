@@ -1,0 +1,966 @@
+[gd_scene load_steps=63 format=2]
+
+[ext_resource path="res://textures/anton_sheet.png" type="Texture" id=1]
+[ext_resource path="res://textures/hey_bar_out.png" type="Texture" id=2]
+[ext_resource path="res://textures/hey_bar_in.png" type="Texture" id=3]
+[ext_resource path="res://sfx/punch.wav" type="AudioStream" id=4]
+[ext_resource path="res://sfx/snd_anton_jump.wav" type="AudioStream" id=5]
+[ext_resource path="res://textures/hey.png" type="Texture" id=6]
+[ext_resource path="res://sfx/anton_hey.wav" type="AudioStream" id=7]
+[ext_resource path="res://textures/anton_sheet_ice.png" type="Texture" id=8]
+[ext_resource path="res://textures/frozen_anton.png" type="Texture" id=9]
+[ext_resource path="res://textures/star.png" type="Texture" id=10]
+[ext_resource path="res://sfx/freeze.ogg" type="AudioStream" id=11]
+[ext_resource path="res://sfx/glass.ogg" type="AudioStream" id=12]
+[ext_resource path="res://sfx/shake.ogg" type="AudioStream" id=13]
+[ext_resource path="res://sfx/slam.ogg" type="AudioStream" id=14]
+[ext_resource path="res://textures/anton_lookingdown.png" type="Texture" id=15]
+[ext_resource path="res://textures/anton_cutscene.png" type="Texture" id=16]
+[ext_resource path="res://textures/anton_forward.png" type="Texture" id=17]
+
+[sub_resource type="GDScript" id=2]
+resource_name = "Anton"
+script/source = "extends KinematicBody2D
+
+var state = -1
+
+onready var speed = 17500
+onready var jump_power = 650
+
+var gravity = 1500.0
+
+var input_vec = Vector2.ZERO # player inputs
+var velocity = Vector2.ZERO # anton's movement
+var snap = Vector2.DOWN * 256
+
+var last_dir = 1
+
+onready var disk = get_tree().get_nodes_in_group(\"Disk\")[0]
+onready var camera = get_tree().get_nodes_in_group(\"Camera\")[0]
+onready var ui = get_tree().get_nodes_in_group(\"UI\")[0]
+
+var can_take_damage = true
+
+var can_call_ball = true
+
+export (bool) var off_screen_die = true
+
+var laugh = false
+var shock = false
+
+var landed = true
+
+var flying = false
+
+var on_ice = false
+
+var frict = 0.2
+
+signal damage
+
+var break_freeze = 0
+
+var jumped_from_ring = false
+
+signal unfrozen
+
+var anim_override = false
+
+## audio
+onready var dmgsfx = [preload(\"res://sfx/snd_anton_hurt1.wav\"),preload(\"res://sfx/snd_anton_hurt2.wav\"),preload(\"res://sfx/snd_anton_hurt3.wav\")]
+onready var stepsfx = [preload(\"res://sfx/snd_anton_step1.ogg\"), preload(\"res://sfx/snd_anton_step2.ogg\"), preload(\"res://sfx/snd_anton_step3.ogg\")]
+onready var happysfx = [preload(\"res://sfx/snd_anton_yay1.wav\"), preload(\"res://sfx/snd_anton_yay2.wav\"), preload(\"res://sfx/snd_anton_yay3.wav\")]
+
+func _ready():
+	for ray in $FloorCasts.get_children():
+		ray.add_exception(self)
+	set_physics_process(true)
+
+## Get inputs
+func get_input():
+	input_vec = Vector2.ZERO
+	if Input.is_action_pressed(\"move_left\"):
+		input_vec.x -= 1
+		last_dir = -1
+	if Input.is_action_pressed(\"move_right\"):
+		input_vec.x += 1
+		last_dir = 1
+	if Input.is_action_pressed(\"move_up\"):
+		input_vec.y -= 1
+	if Input.is_action_pressed(\"move_down\"):
+		input_vec.y += 1
+	
+	# jumping
+	if Input.is_action_just_pressed(\"jump\") and on_ground():
+		snap = Vector2.ZERO
+		velocity.y = -jump_power
+		$SFXJump.play()
+		$Squash.play(\"jump\")
+	if Input.is_action_just_released(\"jump\") and !on_ground() and velocity.y < 0 and !jumped_from_ring:
+		velocity.y = 0.0
+	
+	# disk
+	
+	if Input.is_action_just_pressed(\"throw\"):
+		throw_disc()
+	
+	# calling
+	
+	if Input.is_action_just_pressed(\"call\"):
+		call_ball()
+
+func anims():
+	var suffix = \"\"
+	if on_ice: suffix = \"_ice\"
+	if !laugh and !shock:
+		$Sprite.flip_h = velocity.x < 0
+		if on_ground():
+			## horizontal
+			if abs(velocity.x) > 10:
+				$Sprite.play(\"move\" + suffix)
+			else:
+				$Sprite.play(\"idle\" + suffix)
+		else:
+			if velocity.y < 0:
+				# jumping
+				$Sprite.play(\"jump\")
+			else:
+				$Sprite.play(\"fall\")
+	elif laugh:
+		$Sprite.flip_h = false
+		$Sprite.play(\"win\")
+	elif shock:
+		$Sprite.play(\"damage\")
+
+func on_ground():
+	if flying: return false
+	for ray in $FloorCasts.get_children():
+		if ray.is_colliding():
+			if ray.get_collider().is_in_group(\"Ice\"): on_ice = true
+			else: on_ice = false
+			land()
+			return true
+	landed = false
+	return false
+
+func _physics_process(delta):
+	match state:
+		0:
+			if on_ice: frict = 0.02
+			else: frict = 0.2
+			## Normal
+			get_input()
+			anims()
+			if !on_ground():
+				velocity.y += gravity * delta
+			if !flying:
+				velocity.x = lerp(velocity.x, input_vec.x * speed * delta, frict)
+			velocity = move_and_slide_with_snap(velocity, snap, Vector2.UP, true, 4, deg2rad(52))
+			if on_ground():
+				snap = Vector2.DOWN * 16
+			else:
+				snap = Vector2.ZERO
+		1:
+			## Being moved (damage)
+			$Sprite.play(\"damage\")
+			velocity.y += gravity * delta
+			velocity.x = lerp(velocity.x, 0, 0.2)
+			velocity = move_and_slide_with_snap(velocity, Vector2(0,-32), Vector2(0,-1), true)
+		2:
+			## Being moved (cutscene)
+			if !anim_override:
+				anims()
+			if !on_ground():
+				velocity.y += gravity * delta
+			velocity.x = lerp(velocity.x, 0, 0.2)
+			velocity = move_and_slide_with_snap(velocity, snap, Vector2.UP, true, 4, deg2rad(52))
+			if on_ground():
+				snap = Vector2.DOWN * 16
+			else:
+				snap = Vector2.ZERO
+		3:
+			## Frozen
+			if !on_ground():
+				velocity.y += gravity * delta * 1.5
+			velocity.x = lerp(velocity.x, 0, 0.2)
+			velocity = move_and_slide_with_snap(velocity, snap, Vector2.UP, true, 4, deg2rad(52))
+			if on_ground():
+				snap = Vector2.DOWN * 16
+			else:
+				snap = Vector2.ZERO
+			
+			if velocity.y > 0:
+				$Sprite.play(\"frozen_fall\")
+			else:
+				$Sprite.play(\"frozen\")
+			
+			if Input.is_action_just_pressed(\"jump\") and on_ground():
+				if break_freeze >= 5:
+					state = 0
+					can_take_damage = false
+					$Poof.restart()
+					$Invin.play(\"invin\")
+					emit_signal(\"unfrozen\")
+					$Break.play()
+					yield($Invin, \"animation_finished\")
+					can_take_damage = true
+				else:
+					$Squash.stop()
+					$Squash.play(\"break\")
+					$Shake.play()
+					break_freeze += 1
+	
+	if can_call_ball:
+		$HeyBar.visible = false
+	else:
+		$HeyBar.value = 1.0 - ($BallCall.time_left / $BallCall.wait_time)
+		$HeyBar.visible = true
+
+func throw_disc():
+	var disk_dir = Vector2(last_dir, 0)
+	if input_vec != Vector2.ZERO:
+		disk_dir = input_vec
+	
+	disk.throw(disk_dir)
+
+func take_damage(pos = Vector2.ZERO, fire=false):
+	if can_take_damage:
+		var rng = RandomNumberGenerator.new()
+		rng.randomize()
+		var sfx = rng.randi_range(0,2)
+		$SFXPunch.play()
+		$SFXDamage.stream = dmgsfx[sfx]
+		$SFXDamage.play()
+		
+		
+		can_take_damage = false
+		camera.add_trauma(0.5)
+		if !Globals.infinite_hp:
+			ui.take_damage()
+		emit_signal(\"damage\")
+		
+		if fire:
+			state = 1
+			velocity = Vector2(0,-1000)
+		elif pos != Vector2.ZERO:
+			state = 1
+			velocity = (self.global_position - pos).normalized() * 800
+		yield(get_tree().create_timer(0.5, false), \"timeout\")
+		state = 0
+		$Invin.play(\"invin\")
+		yield($Invin, \"animation_finished\")
+		can_take_damage = true
+	elif fire:
+		velocity = Vector2(0,-1000)
+
+func _on_HitArea_body_entered(body):
+	# Hitting ball
+	if body.is_in_group(\"Ball\"):
+		body.hit(self.global_position, false, input_vec)
+
+func call_ball():
+	if can_call_ball:
+		can_call_ball = false
+		$BallCall.start()
+		$Hey/AnimationPlayer.play(\"hey\")
+		$Squash.play(\"hey\")
+		$SFXHey.play()
+		camera.add_trauma(0.2)
+		for ball in get_tree().get_nodes_in_group(\"Ball\"):
+			
+			ball.call_ball()
+
+func _on_BallCall_timeout():
+	can_call_ball = true
+
+func _on_Sprite_frame_changed():
+	if $Sprite.animation == \"move\" or $Sprite.animation == \"move_sad\":
+		$SFXStep.pitch_scale = 1
+		var rng = RandomNumberGenerator.new()
+		rng.randomize()
+		var sfx = rng.randi_range(0,2)
+		$SFXStep.stream = stepsfx[sfx]
+		$SFXStep.play()
+	elif $Sprite.animation == \"move_ice\":
+		$SFXStep.pitch_scale = 1.1
+		var rng = RandomNumberGenerator.new()
+		rng.randomize()
+		var sfx = rng.randi_range(0,2)
+		$SFXStep.stream = stepsfx[sfx]
+		$SFXStep.play()
+
+func play_happy_sfx():
+	var rng = RandomNumberGenerator.new()
+	rng.randomize()
+	var sfx = rng.randi_range(0,2)
+	$SFXHappy.stream = happysfx[sfx]
+	$SFXHappy.play()
+
+func die():
+	self.state = 1
+	ui.die()
+
+func _on_VisibilityNotifier2D_screen_exited():
+	if off_screen_die and !get_tree().paused:
+		die()
+		state = -1
+
+func celebrate():
+	$SFXHappy.stream = happysfx[1]
+	$SFXHappy.play()
+	laugh = true
+
+func shock():
+	$SFXDamage.stream = load(\"res://sfx/sn_antonVoice_hurtAah.ogg\")
+	$SFXDamage.play()
+	snap = Vector2.ZERO
+	velocity.y = -650
+	shock = true
+
+func land():
+	if !landed:
+		jumped_from_ring = false
+		if state != 3:
+			$Squash.play(\"land\")
+		else:
+			$Slam.play()
+			camera.add_trauma(0.5)
+		landed = true
+
+func swing(pos):
+	flying = true
+	jumped_from_ring = true
+	var vec = (pos - self.global_position).normalized()
+	vec = vec * 1100
+	velocity = Vector2.ZERO
+	velocity += vec
+	yield(get_tree().create_timer(0.3, false), \"timeout\")
+	flying = false
+
+func play_wow():
+	$SFXHappy.stream = load(\"res://sfx/snd_anton_yay3.wav\")
+	$SFXHappy.play()
+
+func freeze():
+	if state != 3 and can_take_damage:
+		$Freeze.play()
+		break_freeze = 0
+		$Poof.restart()
+		state = 3
+
+func _on_MetalBreak_body_entered(body):
+	if body.is_in_group(\"Brick\"):
+		if self.velocity.y > 100 and self.state == 3:
+			body.destroy(false, false, null, true)
+"
+
+[sub_resource type="AtlasTexture" id=16]
+atlas = ExtResource( 1 )
+region = Rect2( 168, 0, 24, 32 )
+
+[sub_resource type="AtlasTexture" id=32]
+atlas = ExtResource( 1 )
+region = Rect2( 144, 0, 24, 32 )
+
+[sub_resource type="AtlasTexture" id=33]
+atlas = ExtResource( 9 )
+region = Rect2( 0, 0, 28, 32 )
+
+[sub_resource type="AtlasTexture" id=34]
+atlas = ExtResource( 9 )
+region = Rect2( 28, 0, 28, 32 )
+
+[sub_resource type="AtlasTexture" id=5]
+atlas = ExtResource( 1 )
+region = Rect2( 0, 0, 24, 32 )
+
+[sub_resource type="AtlasTexture" id=35]
+atlas = ExtResource( 1 )
+region = Rect2( 0, 0, 24, 32 )
+
+[sub_resource type="AtlasTexture" id=7]
+atlas = ExtResource( 1 )
+region = Rect2( 24, 0, 24, 32 )
+
+[sub_resource type="AtlasTexture" id=8]
+atlas = ExtResource( 1 )
+region = Rect2( 24, 0, 24, 32 )
+
+[sub_resource type="AtlasTexture" id=36]
+atlas = ExtResource( 1 )
+region = Rect2( 24, 0, 24, 32 )
+
+[sub_resource type="AtlasTexture" id=37]
+atlas = ExtResource( 1 )
+region = Rect2( 48, 0, 24, 32 )
+
+[sub_resource type="AtlasTexture" id=38]
+atlas = ExtResource( 8 )
+region = Rect2( 0, 0, 28, 32 )
+
+[sub_resource type="AtlasTexture" id=39]
+atlas = ExtResource( 8 )
+region = Rect2( 28, 0, 28, 32 )
+
+[sub_resource type="AtlasTexture" id=60]
+atlas = ExtResource( 16 )
+region = Rect2( 0, 0, 28, 32 )
+
+[sub_resource type="AtlasTexture" id=61]
+atlas = ExtResource( 16 )
+region = Rect2( 28, 0, 28, 32 )
+
+[sub_resource type="AtlasTexture" id=40]
+atlas = ExtResource( 1 )
+region = Rect2( 120, 0, 24, 32 )
+
+[sub_resource type="AtlasTexture" id=53]
+atlas = ExtResource( 16 )
+region = Rect2( 112, 0, 28, 32 )
+
+[sub_resource type="AtlasTexture" id=51]
+atlas = ExtResource( 15 )
+region = Rect2( 0, 0, 28, 32 )
+
+[sub_resource type="AtlasTexture" id=52]
+atlas = ExtResource( 15 )
+region = Rect2( 28, 0, 28, 32 )
+
+[sub_resource type="AtlasTexture" id=58]
+atlas = ExtResource( 16 )
+region = Rect2( 196, 0, 28, 32 )
+
+[sub_resource type="AtlasTexture" id=59]
+atlas = ExtResource( 16 )
+region = Rect2( 224, 0, 28, 32 )
+
+[sub_resource type="AtlasTexture" id=41]
+atlas = ExtResource( 1 )
+region = Rect2( 72, 0, 24, 32 )
+
+[sub_resource type="AtlasTexture" id=42]
+atlas = ExtResource( 1 )
+region = Rect2( 96, 0, 24, 32 )
+
+[sub_resource type="AtlasTexture" id=43]
+atlas = ExtResource( 8 )
+region = Rect2( 56, 0, 28, 32 )
+
+[sub_resource type="AtlasTexture" id=44]
+atlas = ExtResource( 8 )
+region = Rect2( 84, 0, 28, 32 )
+
+[sub_resource type="AtlasTexture" id=54]
+atlas = ExtResource( 16 )
+region = Rect2( 56, 0, 28, 32 )
+
+[sub_resource type="AtlasTexture" id=55]
+atlas = ExtResource( 16 )
+region = Rect2( 84, 0, 28, 32 )
+
+[sub_resource type="AtlasTexture" id=56]
+atlas = ExtResource( 16 )
+region = Rect2( 140, 0, 28, 32 )
+
+[sub_resource type="AtlasTexture" id=57]
+atlas = ExtResource( 16 )
+region = Rect2( 168, 0, 28, 32 )
+
+[sub_resource type="AtlasTexture" id=62]
+atlas = ExtResource( 16 )
+region = Rect2( 252, 0, 28, 32 )
+
+[sub_resource type="AtlasTexture" id=45]
+atlas = ExtResource( 1 )
+region = Rect2( 192, 0, 24, 32 )
+
+[sub_resource type="AtlasTexture" id=46]
+atlas = ExtResource( 1 )
+region = Rect2( 216, 0, 24, 32 )
+
+[sub_resource type="SpriteFrames" id=48]
+animations = [ {
+"frames": [ SubResource( 16 ) ],
+"loop": false,
+"name": "damage",
+"speed": 0.0
+}, {
+"frames": [ SubResource( 32 ) ],
+"loop": false,
+"name": "fall",
+"speed": 0.0
+}, {
+"frames": [ SubResource( 33 ) ],
+"loop": false,
+"name": "frozen",
+"speed": 0.0
+}, {
+"frames": [ SubResource( 34 ) ],
+"loop": false,
+"name": "frozen_fall",
+"speed": 0.0
+}, {
+"frames": [ SubResource( 5 ), SubResource( 35 ), SubResource( 5 ), SubResource( 5 ), SubResource( 5 ), SubResource( 7 ), SubResource( 5 ), SubResource( 5 ), SubResource( 5 ), SubResource( 5 ), SubResource( 5 ), SubResource( 5 ), SubResource( 5 ), SubResource( 5 ), SubResource( 5 ), SubResource( 5 ), SubResource( 5 ), SubResource( 5 ), SubResource( 5 ), SubResource( 8 ), SubResource( 5 ), SubResource( 5 ), SubResource( 5 ), SubResource( 5 ), SubResource( 5 ), SubResource( 36 ), SubResource( 37 ), SubResource( 37 ), SubResource( 37 ), SubResource( 37 ), SubResource( 37 ), SubResource( 37 ), SubResource( 37 ), SubResource( 37 ), SubResource( 37 ), SubResource( 37 ), SubResource( 37 ), SubResource( 37 ), SubResource( 37 ), SubResource( 36 ), SubResource( 5 ), SubResource( 5 ), SubResource( 5 ), SubResource( 5 ), SubResource( 5 ) ],
+"loop": true,
+"name": "idle",
+"speed": 6.0
+}, {
+"frames": [ SubResource( 38 ), SubResource( 38 ), SubResource( 38 ), SubResource( 38 ), SubResource( 39 ), SubResource( 38 ), SubResource( 38 ), SubResource( 38 ), SubResource( 38 ), SubResource( 38 ), SubResource( 38 ), SubResource( 39 ) ],
+"loop": true,
+"name": "idle_ice",
+"speed": 6.0
+}, {
+"frames": [ SubResource( 60 ), SubResource( 60 ), SubResource( 60 ), SubResource( 60 ), SubResource( 60 ), SubResource( 61 ), SubResource( 60 ), SubResource( 60 ), SubResource( 60 ), SubResource( 60 ), SubResource( 60 ), SubResource( 60 ), SubResource( 60 ), SubResource( 60 ), SubResource( 60 ), SubResource( 60 ), SubResource( 60 ), SubResource( 61 ) ],
+"loop": true,
+"name": "idle_sad",
+"speed": 6.0
+}, {
+"frames": [ SubResource( 40 ) ],
+"loop": true,
+"name": "jump",
+"speed": 0.0
+}, {
+"frames": [ SubResource( 53 ) ],
+"loop": false,
+"name": "kick",
+"speed": 0.0
+}, {
+"frames": [ ExtResource( 17 ) ],
+"loop": false,
+"name": "lookat",
+"speed": 0.0
+}, {
+"frames": [ SubResource( 51 ), SubResource( 51 ), SubResource( 51 ), SubResource( 51 ), SubResource( 51 ), SubResource( 51 ), SubResource( 51 ), SubResource( 51 ), SubResource( 51 ), SubResource( 52 ), SubResource( 51 ), SubResource( 51 ), SubResource( 51 ), SubResource( 51 ), SubResource( 51 ), SubResource( 52 ) ],
+"loop": true,
+"name": "lookingdown",
+"speed": 6.0
+}, {
+"frames": [ SubResource( 58 ), SubResource( 58 ), SubResource( 58 ), SubResource( 58 ), SubResource( 58 ), SubResource( 58 ), SubResource( 58 ), SubResource( 58 ), SubResource( 59 ), SubResource( 58 ), SubResource( 58 ), SubResource( 58 ), SubResource( 58 ), SubResource( 58 ), SubResource( 59 ), SubResource( 58 ), SubResource( 58 ), SubResource( 58 ), SubResource( 58 ), SubResource( 58 ), SubResource( 58 ), SubResource( 58 ) ],
+"loop": true,
+"name": "lookingup",
+"speed": 6.0
+}, {
+"frames": [ SubResource( 41 ), SubResource( 42 ) ],
+"loop": true,
+"name": "move",
+"speed": 10.0
+}, {
+"frames": [ SubResource( 43 ), SubResource( 44 ) ],
+"loop": true,
+"name": "move_ice",
+"speed": 12.0
+}, {
+"frames": [ SubResource( 54 ), SubResource( 55 ) ],
+"loop": true,
+"name": "move_sad",
+"speed": 10.0
+}, {
+"frames": [ SubResource( 56 ), SubResource( 57 ) ],
+"loop": false,
+"name": "shock",
+"speed": 0.0
+}, {
+"frames": [ SubResource( 62 ) ],
+"loop": false,
+"name": "stare",
+"speed": 0.0
+}, {
+"frames": [ SubResource( 45 ), SubResource( 46 ) ],
+"loop": true,
+"name": "win",
+"speed": 6.0
+} ]
+
+[sub_resource type="RectangleShape2D" id=1]
+extents = Vector2( 20, 28 )
+
+[sub_resource type="Animation" id=19]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/path = NodePath("Sprite:self_modulate")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/keys = {
+"times": PoolRealArray( 0 ),
+"transitions": PoolRealArray( 1 ),
+"update": 0,
+"values": [ Color( 1, 1, 1, 1 ) ]
+}
+
+[sub_resource type="Animation" id=4]
+resource_name = "invin"
+length = 2.0
+tracks/0/type = "value"
+tracks/0/path = NodePath("Sprite:self_modulate")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/keys = {
+"times": PoolRealArray( 0, 0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.4, 1.6, 1.7, 1.8, 1.9, 2 ),
+"transitions": PoolRealArray( 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 ),
+"update": 1,
+"values": [ Color( 1, 1, 1, 0.509804 ), Color( 1, 1, 1, 0.156863 ), Color( 1, 1, 1, 0.509804 ), Color( 1, 1, 1, 0.156863 ), Color( 1, 1, 1, 0.509804 ), Color( 1, 1, 1, 0.156863 ), Color( 1, 1, 1, 0.509804 ), Color( 1, 1, 1, 0.156863 ), Color( 1, 1, 1, 0.509804 ), Color( 1, 1, 1, 0.156863 ), Color( 1, 1, 1, 0.509804 ), Color( 1, 1, 1, 0.156863 ), Color( 1, 1, 1, 1 ) ]
+}
+
+[sub_resource type="Animation" id=22]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/path = NodePath("Sprite:scale")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/keys = {
+"times": PoolRealArray( 0 ),
+"transitions": PoolRealArray( 1 ),
+"update": 0,
+"values": [ Vector2( 2, 2 ) ]
+}
+tracks/1/type = "value"
+tracks/1/path = NodePath("Sprite:position")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/keys = {
+"times": PoolRealArray( 0 ),
+"transitions": PoolRealArray( 1 ),
+"update": 0,
+"values": [ Vector2( 0, 0 ) ]
+}
+tracks/2/type = "value"
+tracks/2/path = NodePath("Sprite:offset")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/keys = {
+"times": PoolRealArray( 0 ),
+"transitions": PoolRealArray( 1 ),
+"update": 0,
+"values": [ Vector2( 0, 0 ) ]
+}
+
+[sub_resource type="Animation" id=49]
+length = 0.1
+step = 0.05
+tracks/0/type = "value"
+tracks/0/path = NodePath("Sprite:scale")
+tracks/0/interp = 2
+tracks/0/loop_wrap = true
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/keys = {
+"times": PoolRealArray( 0 ),
+"transitions": PoolRealArray( 1 ),
+"update": 0,
+"values": [ Vector2( 2, 2 ) ]
+}
+tracks/1/type = "value"
+tracks/1/path = NodePath("Sprite:offset")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/keys = {
+"times": PoolRealArray( 0, 0.05, 0.1 ),
+"transitions": PoolRealArray( 1, 1, 1 ),
+"update": 0,
+"values": [ Vector2( 3, 0 ), Vector2( -3, 0 ), Vector2( 0, 0 ) ]
+}
+
+[sub_resource type="Animation" id=24]
+resource_name = "hey"
+length = 0.2
+tracks/0/type = "value"
+tracks/0/path = NodePath("Sprite:scale")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/keys = {
+"times": PoolRealArray( 0, 0.2 ),
+"transitions": PoolRealArray( 0.5, 1 ),
+"update": 0,
+"values": [ Vector2( 3, 3 ), Vector2( 2, 2 ) ]
+}
+tracks/1/type = "value"
+tracks/1/path = NodePath("Sprite:position")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/keys = {
+"times": PoolRealArray( 0 ),
+"transitions": PoolRealArray( 1 ),
+"update": 0,
+"values": [ Vector2( 0, 0 ) ]
+}
+
+[sub_resource type="Animation" id=3]
+resource_name = "jump"
+length = 0.2
+tracks/0/type = "value"
+tracks/0/path = NodePath("Sprite:scale")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/keys = {
+"times": PoolRealArray( 0, 0.2 ),
+"transitions": PoolRealArray( 0.5, 1 ),
+"update": 0,
+"values": [ Vector2( 1, 2 ), Vector2( 2, 2 ) ]
+}
+tracks/1/type = "value"
+tracks/1/path = NodePath("Sprite:position")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/keys = {
+"times": PoolRealArray( 0 ),
+"transitions": PoolRealArray( 1 ),
+"update": 0,
+"values": [ Vector2( 0, 0 ) ]
+}
+
+[sub_resource type="Animation" id=23]
+resource_name = "land"
+length = 0.2
+tracks/0/type = "value"
+tracks/0/path = NodePath("Sprite:scale")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/keys = {
+"times": PoolRealArray( 0, 0.2 ),
+"transitions": PoolRealArray( 0.594604, 0.5 ),
+"update": 0,
+"values": [ Vector2( 3, 1 ), Vector2( 2, 2 ) ]
+}
+tracks/1/type = "value"
+tracks/1/path = NodePath("Sprite:position")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/keys = {
+"times": PoolRealArray( 0, 0.2 ),
+"transitions": PoolRealArray( 0.594604, 1 ),
+"update": 0,
+"values": [ Vector2( 0, 16 ), Vector2( 0, 0 ) ]
+}
+
+[sub_resource type="Animation" id=20]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/path = NodePath(".:scale")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/keys = {
+"times": PoolRealArray( 0 ),
+"transitions": PoolRealArray( 1 ),
+"update": 0,
+"values": [ Vector2( 1e-05, 1e-05 ) ]
+}
+tracks/1/type = "value"
+tracks/1/path = NodePath(".:self_modulate")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/keys = {
+"times": PoolRealArray( 0 ),
+"transitions": PoolRealArray( 1 ),
+"update": 0,
+"values": [ Color( 1, 1, 1, 1 ) ]
+}
+
+[sub_resource type="Animation" id=21]
+resource_name = "hey"
+length = 0.5
+tracks/0/type = "value"
+tracks/0/path = NodePath(".:scale")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/keys = {
+"times": PoolRealArray( 0, 0.1, 0.5 ),
+"transitions": PoolRealArray( 0.3, 1, 1 ),
+"update": 0,
+"values": [ Vector2( 1e-05, 1e-05 ), Vector2( 2, 2 ), Vector2( 2, 2 ) ]
+}
+tracks/1/type = "value"
+tracks/1/path = NodePath(".:self_modulate")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/keys = {
+"times": PoolRealArray( 0, 0.3, 0.5 ),
+"transitions": PoolRealArray( 1, 1, 1 ),
+"update": 0,
+"values": [ Color( 1, 1, 1, 1 ), Color( 1, 1, 1, 1 ), Color( 1, 1, 1, 0 ) ]
+}
+
+[sub_resource type="Curve" id=30]
+_data = [ Vector2( 0, 1 ), 0.0, 0.0, 0, 0, Vector2( 0.505226, 1 ), 0.0, 0.0, 0, 0, Vector2( 1, 0 ), 0.0, 0.0, 0, 0 ]
+
+[sub_resource type="RectangleShape2D" id=50]
+extents = Vector2( 32, 14 )
+
+[node name="Anton" type="KinematicBody2D" groups=["Anton"]]
+collision_layer = 2
+collision_mask = 129
+script = SubResource( 2 )
+
+[node name="Sprite" type="AnimatedSprite" parent="."]
+scale = Vector2( 2, 2 )
+frames = SubResource( 48 )
+animation = "idle"
+frame = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2( 0, 4 )
+shape = SubResource( 1 )
+
+[node name="Invin" type="AnimationPlayer" parent="."]
+anims/RESET = SubResource( 19 )
+anims/invin = SubResource( 4 )
+
+[node name="Squash" type="AnimationPlayer" parent="."]
+anims/RESET = SubResource( 22 )
+anims/break = SubResource( 49 )
+anims/hey = SubResource( 24 )
+anims/jump = SubResource( 3 )
+anims/land = SubResource( 23 )
+
+[node name="FloorCasts" type="Node2D" parent="."]
+
+[node name="Ray1" type="RayCast2D" parent="FloorCasts"]
+position = Vector2( -20, 32 )
+enabled = true
+cast_to = Vector2( 0, 14 )
+collision_mask = 129
+
+[node name="Ray2" type="RayCast2D" parent="FloorCasts"]
+position = Vector2( 20, 32 )
+enabled = true
+cast_to = Vector2( 0, 14 )
+collision_mask = 129
+
+[node name="Ray3" type="RayCast2D" parent="FloorCasts"]
+position = Vector2( 0, 32 )
+enabled = true
+cast_to = Vector2( 0, 14 )
+collision_mask = 129
+
+[node name="HitArea" type="Area2D" parent="."]
+collision_layer = 4
+collision_mask = 8
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="HitArea"]
+position = Vector2( 0, 4 )
+shape = SubResource( 1 )
+
+[node name="HeyBar" type="TextureProgress" parent="."]
+visible = false
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+margin_left = -30.0
+margin_top = -56.0
+margin_bottom = -48.0
+rect_scale = Vector2( 2, 2 )
+max_value = 1.0
+step = 0.1
+texture_under = ExtResource( 2 )
+texture_progress = ExtResource( 3 )
+
+[node name="BallCall" type="Timer" parent="."]
+wait_time = 3.0
+
+[node name="SFXDamage" type="AudioStreamPlayer" parent="."]
+bus = "SFX"
+
+[node name="SFXJump" type="AudioStreamPlayer" parent="."]
+stream = ExtResource( 5 )
+bus = "SFX"
+
+[node name="SFXStep" type="AudioStreamPlayer" parent="."]
+bus = "SFX"
+
+[node name="SFXPunch" type="AudioStreamPlayer" parent="."]
+stream = ExtResource( 4 )
+bus = "SFX"
+
+[node name="SFXHappy" type="AudioStreamPlayer" parent="."]
+bus = "SFX"
+
+[node name="SFXHey" type="AudioStreamPlayer" parent="."]
+stream = ExtResource( 7 )
+bus = "SFX"
+
+[node name="Hey" type="Sprite" parent="."]
+scale = Vector2( 1e-05, 1e-05 )
+texture = ExtResource( 6 )
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="Hey"]
+anims/RESET = SubResource( 20 )
+anims/hey = SubResource( 21 )
+
+[node name="VisibilityNotifier2D" type="VisibilityNotifier2D" parent="."]
+position = Vector2( -1.90735e-06, 4 )
+scale = Vector2( 3, 4.4 )
+
+[node name="Poof" type="CPUParticles2D" parent="."]
+emitting = false
+amount = 16
+lifetime = 0.5
+one_shot = true
+explosiveness = 1.0
+texture = ExtResource( 10 )
+direction = Vector2( 0, 0 )
+spread = 180.0
+gravity = Vector2( 0, 0 )
+initial_velocity = 300.0
+scale_amount = 3.0
+scale_amount_curve = SubResource( 30 )
+
+[node name="MetalBreak" type="Area2D" parent="."]
+position = Vector2( 0, 32 )
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="MetalBreak"]
+position = Vector2( 0, 10 )
+shape = SubResource( 50 )
+
+[node name="Freeze" type="AudioStreamPlayer" parent="."]
+stream = ExtResource( 11 )
+bus = "SFX"
+
+[node name="Break" type="AudioStreamPlayer" parent="."]
+stream = ExtResource( 12 )
+bus = "SFX"
+
+[node name="Shake" type="AudioStreamPlayer" parent="."]
+stream = ExtResource( 13 )
+bus = "SFX"
+
+[node name="Slam" type="AudioStreamPlayer" parent="."]
+stream = ExtResource( 14 )
+bus = "SFX"
+
+[connection signal="frame_changed" from="Sprite" to="." method="_on_Sprite_frame_changed"]
+[connection signal="body_entered" from="HitArea" to="." method="_on_HitArea_body_entered"]
+[connection signal="timeout" from="BallCall" to="." method="_on_BallCall_timeout"]
+[connection signal="screen_exited" from="VisibilityNotifier2D" to="." method="_on_VisibilityNotifier2D_screen_exited"]
+[connection signal="body_entered" from="MetalBreak" to="." method="_on_MetalBreak_body_entered"]

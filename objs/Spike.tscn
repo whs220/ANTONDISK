@@ -1,0 +1,40 @@
+[gd_scene load_steps=4 format=2]
+
+[ext_resource path="res://textures/spike.png" type="Texture" id=1]
+
+[sub_resource type="GDScript" id=2]
+resource_name = "Spike"
+script/source = "extends Area2D
+
+var inn = false
+onready var anton = get_tree().get_nodes_in_group(\"Anton\")[0]
+
+func _on_Spike_body_entered(body):
+	if body == anton:
+		inn = true
+
+func _on_Spike_body_exited(body):
+	if body == anton:
+		inn = false
+
+func _physics_process(delta):
+	if inn:
+		anton.take_damage(self.global_position)
+"
+
+[sub_resource type="RectangleShape2D" id=1]
+extents = Vector2( 12, 12 )
+
+[node name="Spike" type="Area2D"]
+script = SubResource( 2 )
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2( 0, 4 )
+shape = SubResource( 1 )
+
+[node name="Sprite" type="Sprite" parent="."]
+scale = Vector2( 2, 2 )
+texture = ExtResource( 1 )
+
+[connection signal="body_entered" from="." to="." method="_on_Spike_body_entered"]
+[connection signal="body_exited" from="." to="." method="_on_Spike_body_exited"]
