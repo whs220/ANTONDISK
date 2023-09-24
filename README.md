@@ -1,2 +1,2 @@
 # ANTONDISK
- A brick-blastin' game made a year ago for ANTONJAM 3!!
+A brick-blastin' game made for ANTONJAM 3!!
